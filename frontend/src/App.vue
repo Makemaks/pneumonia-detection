@@ -1,60 +1,129 @@
+<script setup lang="ts">
+import AnalyzerPanel from "./components/AnalyzerPanel.vue";
+import AppIcon from "./components/AppIcon.vue";
+import ResearchPage from "./components/ResearchPage.vue";
+import ResearchProcessSection from "./components/ResearchProcessSection.vue";
+
+const isResearch = window.location.pathname.replace(/\/+$/, "") === "/research";
+document.title = isResearch ? "Pulmo — Research" : "Pulmo — Lung intelligence";
+</script>
+
 <template>
   <div class="app-shell">
-    <Toast position="top-right" />
-    <AppHeader :sections="sections" />
+    <a class="skip-link" :href="isResearch ? '#research-main' : '#workspace'">
+      {{ isResearch ? "Skip to research" : "Skip to analyzer" }}
+    </a>
+    <header class="site-header">
+      <a class="brand" href="/#workspace" aria-label="Pulmo home">
+        <span class="brand-symbol"
+          ><svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path
+              d="M14 8v9l-4 4M18 8v9l4 4M11 11C8 9 3 18 4 24c1 4 9 3 9-1V13M21 11c3-2 8 7 7 13-1 4-9 3-9-1V13"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            /></svg
+        ></span>
+        <span class="wordmark">pulmo<span>.</span></span
+        ><span class="brand-divider"></span
+        ><span class="brand-descriptor">Lung intelligence</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a :class="{ 'nav-active': !isResearch }" :aria-current="!isResearch ? 'page' : undefined" href="/#workspace">Workspace</a>
+        <a href="/#how-it-works">How it works</a>
+        <a :class="{ 'nav-active': isResearch }" :aria-current="isResearch ? 'page' : undefined" href="/research">Research</a>
+        <a class="nav-about" href="/#about">About</a>
+      </nav>
+      <span class="research-tag"><span></span> Research edition</span>
+    </header>
 
-    <main>
-      <section id="analyze" class="section hero-section" aria-labelledby="hero-title">
-        <div class="hero-media" aria-hidden="true">
-          <img src="/lungs.png" alt="" class="lung-visual" />
-        </div>
-
-        <div class="hero-copy">
-          <p class="eyebrow">Chest X-ray decision support</p>
-          <h1 id="hero-title">AI Lung Analyzer</h1>
-          <p class="hero-lede">
-            Upload a JPEG or PNG chest X-ray and get a quick pneumonia screening prediction from the trained DenseNet model.
+    <ResearchPage v-if="isResearch" />
+    <main v-else id="workspace" class="main-content">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">
+            <span class="tiny-cross">+</span> A NEW PERSPECTIVE ON LUNG HEALTH
           </p>
-
-          <div class="hero-actions">
-            <a class="primary-link" href="#analyzer">Start analysis</a>
-            <a class="secondary-link" href="#facts">Review facts</a>
-          </div>
-
-          <div class="mini-stats" aria-label="Application highlights">
-            <StatPill value="224px" label="model image size" />
-            <StatPill value="CLAHE" label="contrast preprocessing" />
-            <StatPill value="FastAPI" label="local inference API" />
-          </div>
+          <h1>
+            A clearer view.<br class="mobile-break" />
+            A more informed next step.
+          </h1>
+          <p class="page-description">
+            Explore the anatomy. Upload a chest X-ray. Review your AI-powered
+            analysis.
+          </p>
         </div>
+        <div class="heading-note">
+          <AppIcon name="shield" :size="20" /><span
+            >Designed for exploration.<br /><strong
+              >Guided by human expertise.</strong
+            ></span
+          >
+        </div>
+      </div>
 
-        <AnalyzerPanel id="analyzer" />
+      <AnalyzerPanel />
+
+      <ResearchProcessSection />
+
+      <section
+        id="using-demo"
+        class="workflow"
+        aria-labelledby="workflow-title"
+      >
+        <div class="section-label">
+          <h2 id="workflow-title">Using the interactive demo</h2>
+          <span>Three simple steps</span>
+        </div>
+        <div class="workflow-grid">
+          <article>
+            <span class="workflow-icon"><AppIcon name="upload" /></span>
+            <div>
+              <h3><span>01</span> Upload your X-ray</h3>
+              <p>Choose a clear chest X-ray in JPEG or PNG format.</p>
+            </div>
+            <AppIcon class="workflow-arrow" name="chevron" :size="16" />
+          </article>
+          <article>
+            <span class="workflow-icon"><AppIcon name="scan" /></span>
+            <div>
+              <h3><span>02</span> Let the model analyze</h3>
+              <p>The demo's binary model scores Normal or Pneumonia.</p>
+            </div>
+            <AppIcon class="workflow-arrow" name="chevron" :size="16" />
+          </article>
+          <article>
+            <span class="workflow-icon"><AppIcon name="file" /></span>
+            <div>
+              <h3><span>03</span> Review the result</h3>
+              <p>Explore the prediction and its model score together.</p>
+            </div>
+          </article>
+        </div>
       </section>
 
-      <FactsSection />
-      <WorkflowSection />
-      <SafetySection />
+      <section id="about" class="about-strip" aria-labelledby="about-title">
+        <AppIcon name="info" :size="19" />
+        <div>
+          <h2 id="about-title">An extra perspective, not a diagnosis.</h2>
+          <p>
+            Pulmo uses a DenseNet201 image classifier for research and
+            education. Results may be incorrect and should be interpreted by a
+            qualified clinician alongside patient history. The 3D lungs are an
+            illustration, not a reconstruction of your X-ray.
+          </p>
+        </div>
+        <span class="model-label"
+          >DENSENET201 <span> / </span> BINARY CLASSIFIER</span
+        >
+      </section>
     </main>
-
     <footer class="site-footer">
-      <span>AI Lung Analyzer by Gerald</span>
-      <span>For research and educational use only. Not a medical diagnosis.</span>
+      <a class="footer-brand" href="/#workspace">pulmo.</a
+      ><span>A little more insight. A little more clarity.</span
+      ><a class="footer-research" href="/research">Research & sources</a>
+      <span>For research & education</span>
     </footer>
   </div>
 </template>
-
-<script setup lang="ts">
-import AppHeader from "./components/AppHeader.vue";
-import AnalyzerPanel from "./components/AnalyzerPanel.vue";
-import FactsSection from "./components/FactsSection.vue";
-import SafetySection from "./components/SafetySection.vue";
-import StatPill from "./components/StatPill.vue";
-import WorkflowSection from "./components/WorkflowSection.vue";
-
-const sections = [
-  { label: "Analyze", href: "#analyze" },
-  { label: "Facts", href: "#facts" },
-  { label: "Workflow", href: "#workflow" },
-  { label: "Safety", href: "#safety" },
-];
-</script>
