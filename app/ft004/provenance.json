@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/Gerdoo2001/ai-research",
+  "revision": "7a90abfa3695f61a17e4a2dd959c0da822080b21",
+  "files": {
+    "config.py": "64280ec2571e694a53f3d1e5ad25050f64e4601ebffe31f7fb624365240f2d38",
+    "models.py": "c6a33964a24fd64e214243c5a8afda1ee3f50ae5cded2a358b5a329a28772258",
+    "__init__.py": "6025c8b628fc450bd3841bc02104de69bf3ea845666dbf1c49c5f6ab0f67e304",
+    "preprocessing.py": "4b380747742b639f677ac4fcc513f5f362d56381895eec3f0427c21e4a15d1c7",
+    "inference.py": "48023dbe9cae59cbfa097326339d9e5d539408740048a20251f8d86b98758b1e"
+  },
+  "package_manifest_sha256": "2a5a345022a8b5d1ae965d9a02d06587d79fb1881d0d760c279c500622c939cf"
+}

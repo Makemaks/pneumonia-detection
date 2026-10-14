@@ -153,7 +153,7 @@ onBeforeUnmount(() => {
         <figure class="slide-visual" :class="`visual-kind-${slide.visual}`">
           <figcaption>{{ slide.visualTitle }}</figcaption>
 
-          <ResearchMedia v-if="['lungs','imagery','distribution','uncertainty'].includes(slide.visual)" :kind="slide.visual" />
+          <ResearchMedia v-if="['lungs','imagery','distribution','uncertainty','decision'].includes(slide.visual)" :kind="slide.visual" />
           <template v-else-if="slide.visual === 'ensemble'">
             <div class="ensemble-input"><AppIcon name="image" :size="22" /><strong>The same chest X-ray</strong></div>
             <div class="ensemble-branches">
@@ -226,7 +226,7 @@ onBeforeUnmount(() => {
         <div class="slide-citations"><span>Sources</span>
           <a v-for="source in slide.sources" :key="source" :href="`#research-source-${source}`" :aria-label="sourceLabel(source)" @click.prevent="followReference(source)">[{{ source }}]</a>
         </div>
-        <span>Documented study · FT-011 results pending</span>
+        <span>FT-004 selected · FT-011 complete · tuning closed</span>
       </div>
     </div>
 

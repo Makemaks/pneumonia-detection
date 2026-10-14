@@ -1,0 +1,10 @@
+ARG RUNTIME_IMAGE=pneumonia-ft004-runtime:7a90abf-20261014
+FROM ${RUNTIME_IMAGE}
+ARG APP_REVISION
+LABEL org.opencontainers.image.source="https://github.com/Makemaks/pneumonia-detection" \
+      org.opencontainers.image.revision="${APP_REVISION}" \
+      ai.model.id="FT-004" \
+      ai.model.source="https://github.com/Gerdoo2001/ai-research" \
+      ai.model.revision="7a90abfa3695f61a17e4a2dd959c0da822080b21"
+COPY app ./app
+COPY dist/ /app/app/static/

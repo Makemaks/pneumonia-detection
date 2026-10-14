@@ -89,7 +89,7 @@ document.title = isResearch ? "Pulmo — Research" : "Pulmo — Lung intelligenc
             <span class="workflow-icon"><AppIcon name="scan" /></span>
             <div>
               <h3><span>02</span> Let the model analyze</h3>
-              <p>The demo's binary model scores Normal or Pneumonia.</p>
+              <p>FT-004 averages three models’ Normal, Viral and Bacterial scores.</p>
             </div>
             <AppIcon class="workflow-arrow" name="chevron" :size="16" />
           </article>
@@ -97,7 +97,7 @@ document.title = isResearch ? "Pulmo — Research" : "Pulmo — Lung intelligenc
             <span class="workflow-icon"><AppIcon name="file" /></span>
             <div>
               <h3><span>03</span> Review the result</h3>
-              <p>Explore the prediction and its model score together.</p>
+              <p>Compare all three class scores and review the predicted pattern.</p>
             </div>
           </article>
         </div>
@@ -108,14 +108,14 @@ document.title = isResearch ? "Pulmo — Research" : "Pulmo — Lung intelligenc
         <div>
           <h2 id="about-title">An extra perspective, not a diagnosis.</h2>
           <p>
-            Pulmo uses a DenseNet201 image classifier for research and
-            education. Results may be incorrect and should be interpreted by a
+            Pulmo uses the FT-004 ensemble of three DenseNet201 classifiers for research and
+            education. It compares Normal, Viral Pneumonia and Bacterial Pneumonia patterns. Results may be incorrect and should be interpreted by a
             qualified clinician alongside patient history. The 3D lungs are an
             illustration, not a reconstruction of your X-ray.
           </p>
         </div>
         <span class="model-label"
-          >DENSENET201 <span> / </span> BINARY CLASSIFIER</span
+          >FT-004 <span> / </span> 3 × DENSENET201</span
         >
       </section>
     </main>

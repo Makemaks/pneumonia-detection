@@ -4,24 +4,27 @@ Author: John Mark
 """
 
 import io
+import asyncio
 from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
+from starlette.concurrency import run_in_threadpool
 import importlib.resources as pkg_resources
 
 from app.schemas import PredictionResponse
-from app.inference import predict, load_model
+from app.inference import predict, load_model, model_status, InferenceBusyError
 
 
 # =====================================================
 # FastAPI app config
 # =====================================================
-app = FastAPI(title="Pneumonia Classification API", version="1.0.0")
+app = FastAPI(title="FT-004 Chest X-ray Research API", version="2.0.0")
+analysis_gate = asyncio.Lock()
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,11 +77,8 @@ async def swagger_redirect():
 # =====================================================
 @app.on_event("startup")
 def warmup():
-    try:
-        load_model()
-        print("Model preloaded successfully.")
-    except Exception as e:
-        print(f"[WARN] Model preload failed: {e}")
+    # A failed checkpoint verification must prevent an apparently healthy service.
+    load_model()
 
 
 # =====================================================
@@ -86,27 +86,47 @@ def warmup():
 # =====================================================
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    status = model_status()
+    return JSONResponse(status, status_code=200 if status["status"] == "ok" else 503)
 
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_endpoint(file: UploadFile = File(...)):
+    # Keep full-resolution decoding bounded as well as model inference.
+    if analysis_gate.locked():
+        raise HTTPException(status_code=503, detail="The analysis service is busy. Please retry in a moment.", headers={"Retry-After": "2"})
+    async with analysis_gate:
+        return await analyze_upload(file)
+
+
+async def analyze_upload(file: UploadFile):
     if file.content_type not in {"image/jpeg", "image/png"}:
         raise HTTPException(status_code=415, detail="Only JPEG or PNG images are supported.")
 
     try:
-        raw = await file.read()
+        raw = await file.read(5_000_001)
+        if len(raw) > 5_000_000:
+            raise HTTPException(status_code=413, detail="Image exceeds the 5 MB limit.")
         img = Image.open(io.BytesIO(raw))
+        if img.format not in {"JPEG", "PNG"}:
+            raise HTTPException(status_code=415, detail="Only JPEG or PNG images are supported.")
+        if img.width * img.height > 16_000_000:
+            raise HTTPException(status_code=413, detail="Image exceeds the 16 megapixel limit.")
+        img.load()
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file.")
 
     try:
-        result = predict(img)
+        result = await run_in_threadpool(predict, img)
         return PredictionResponse(**result)
+    except InferenceBusyError as e:
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": "2"})
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=f"Model not found: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Inference error: {e}")
+        raise HTTPException(status_code=500, detail="The analysis could not be completed.") from e
 
 
 # =====================================================

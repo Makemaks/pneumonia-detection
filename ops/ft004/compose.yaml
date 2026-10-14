@@ -1,0 +1,67 @@
+name: pneumonia
+services:
+  app:
+    image: ${PNEUMONIA_FT004_IMAGE:?Set the verified FT-004 image}
+    container_name: pneumonia_app
+    restart: unless-stopped
+    init: true
+    user: "10001:10001"
+    read_only: true
+    ports:
+      - "127.0.0.1:8090:8000"
+    mem_limit: 1024m
+    memswap_limit: 1024m
+    cpus: 0.75
+    pids_limit: 256
+    stop_grace_period: 30s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m,mode=1777
+    environment:
+      FT004_SELECTION_PATH: /app/model/artifacts/ft004/selection.json
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --workers
+      - "1"
+      - --limit-concurrency
+      - "8"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - "*"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import json, urllib.request;
+          response = urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3);
+          result = json.load(response);
+          assert result['status'] == 'ok' and result['model'] == 'FT-004' and result['member_count'] == 3
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    networks:
+      - application
+networks:
+  application:
+    name: pneumonia_application
+    driver: bridge

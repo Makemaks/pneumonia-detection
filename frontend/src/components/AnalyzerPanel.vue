@@ -4,6 +4,8 @@ import AppIcon from "./AppIcon.vue";
 import LungViewer from "./LungViewer.vue";
 import ResultCard from "./ResultCard.vue";
 import {
+  CLASS_ORDER,
+  PREDICTION_LABELS,
   parsePrediction,
   validateImage,
   type PredictionResult,
@@ -15,6 +17,8 @@ const imageSize = ref("");
 const fileInput = ref<HTMLInputElement | null>(null);
 const browseButton = ref<HTMLButtonElement | null>(null);
 const result = ref<PredictionResult | null>(null);
+const resultOpen = ref(false);
+const viewResultButton = ref<HTMLButtonElement | null>(null);
 const completedAt = ref("");
 const loading = ref(false);
 const validating = ref(false);
@@ -59,7 +63,11 @@ async function checkConnection() {
     const data = await response.json();
     if (controller === healthRequest && !disposed)
       connection.value =
-        response.ok && data.status === "ok" ? "connected" : "offline";
+        response.ok && data.status === "ok" && data.model === "FT-004" &&
+        data.member_count === 3 && Array.isArray(data.class_order) &&
+        data.class_order.length === CLASS_ORDER.length &&
+        CLASS_ORDER.every((label, index) => data.class_order[index] === label)
+          ? "connected" : "offline";
   } catch {
     if (controller === healthRequest && !disposed) connection.value = "offline";
   } finally {
@@ -82,7 +90,12 @@ function cancel() {
   clearTimers();
   loading.value = false;
 }
+function closeResults() {
+  resultOpen.value = false;
+  void nextTick(() => viewResultButton.value?.focus({ preventScroll: true }));
+}
 function reset() {
+  resultOpen.value = false;
   cancel();
   selectionVersion++;
   releasePreview();
@@ -181,6 +194,7 @@ async function analyze() {
     if (request !== controller || disposed) return;
     result.value = data;
     completedAt.value = new Date().toISOString();
+    resultOpen.value = true;
     connection.value = "connected";
   } catch (cause) {
     if (request !== controller || disposed) return;
@@ -268,7 +282,7 @@ onBeforeUnmount(() => {
           <p>
             {{
               loading
-                ? "The model is analyzing your image for pneumonia."
+                ? "FT-004 is comparing Normal, Viral and Bacterial patterns."
                 : selectedFile
                   ? "Review your image, then start the analysis."
                   : "A single image. A new layer of insight."
@@ -410,15 +424,29 @@ onBeforeUnmount(() => {
           >
         </p>
       </template>
-      <template v-else
-        ><h2 id="analyzer-title" class="visually-hidden">
-          Your analysis results
-        </h2>
+      <template v-else>
+        <div class="completed-analysis">
+          <span class="completion-seal"><AppIcon name="check" :size="25" /></span>
+          <p class="completion-eyebrow" role="status">ANALYSIS COMPLETE</p>
+          <h2 id="analyzer-title">Your results are ready.</h2>
+          <p>Take a closer look at your image and the model’s findings.</p>
+          <div class="completed-image">
+            <img :src="previewUrl" alt="Analyzed chest X-ray thumbnail" />
+            <div><span>FT-004 MODEL PREDICTION</span><strong>{{ PREDICTION_LABELS[result.label] }} pattern</strong><small :title="selectedFile?.name">{{ selectedFile?.name }}</small></div>
+            <AppIcon name="file" :size="19" />
+          </div>
+          <button ref="viewResultButton" class="analyze-button" type="button" aria-haspopup="dialog" @click="resultOpen = true"><AppIcon name="scan" :size="18" />View full results<AppIcon name="arrow" :size="18" /></button>
+          <button class="text-button" type="button" @click="reset">Start a new analysis</button>
+        </div>
         <ResultCard
+          :open="resultOpen"
           :result="result"
           :file-name="selectedFile?.name || 'X-ray'"
           :preview-url="previewUrl"
           :completed-at="completedAt"
+          :image-size="imageSize"
+          :file-size="fileSize"
+          @close="closeResults"
           @reset="reset"
       /></template>
       <div class="panel-footnote">
@@ -428,3 +456,19 @@ onBeforeUnmount(() => {
     </section>
   </div>
 </template>
+
+<style scoped>
+.completed-analysis { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px 0 24px; text-align: center; }
+.completion-seal { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; background: #edf4e9; color: #538064; box-shadow: 0 0 0 7px #f7faf4; margin-bottom: 23px; }
+.completion-eyebrow { font-size: 9px; letter-spacing: 1.8px; color: #7b9270; }
+.completed-analysis h2 { font-family: 'Manrope',sans-serif; font-size: 25px; letter-spacing: -.8px; font-weight: 550; margin: 9px 0; }
+.completed-analysis > p:not(.completion-eyebrow) { color: #819075; font-size: 12px; line-height: 1.7; max-width: 280px; }
+.completed-image { width: 100%; display: flex; align-items: center; gap: 15px; padding: 13px; background: #f7f9f3; border: 1px solid #e3e9dc; border-radius: 10px; margin: 26px 0 0; text-align: left; }
+.completed-image img { width: 63px; height: 70px; object-fit: contain; border-radius: 5px; background: #192b25; }
+.completed-image > div { min-width: 0; display: grid; gap: 7px; flex: 1; }
+.completed-image span { color: #89997c; font-size: 8px; letter-spacing: 1.1px; }
+.completed-image strong { font-size: 15px; font-weight: 500; color: #496343; }
+.completed-image small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: #89977e; }
+.completed-image > svg { color: #92a484; flex-shrink: 0; margin-right: 4px; }
+.completed-analysis .text-button { margin-top: 17px; }
+</style>

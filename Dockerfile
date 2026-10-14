@@ -6,12 +6,13 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM python:3.11-slim
+FROM python:3.12-slim-bookworm
 
-ENV MODEL_PATH=/app/model/outputs/binary/v2/densenet201/densenet201_pneumonia.h5 \
+ENV FT004_SELECTION_PATH=/app/model/artifacts/ft004/selection.json \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    TF_USE_LEGACY_KERAS=1
+    OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1
 
 WORKDIR /app
 
@@ -23,7 +24,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
-COPY model ./model
+COPY model/artifacts/ft004 ./model/artifacts/ft004
 COPY --from=frontend-builder /frontend/dist ./app/static
 
 EXPOSE 8000

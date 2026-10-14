@@ -1,0 +1,15 @@
+{
+  "name": "pneumonia-detection-local",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "setup": "bash scripts/setup-local.sh",
+    "dev": "node scripts/dev.mjs",
+    "dev:backend": "bash scripts/start-backend.sh --reload --reload-dir app",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "bash scripts/start-local.sh"
+  }
+}

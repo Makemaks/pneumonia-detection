@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import LungViewer from "./LungViewer.vue";
+import AppIcon from "./AppIcon.vue";
+import { finalScreeningGates, matchedSeedScores } from "../content/researchContent";
 defineProps<{ kind: string }>();
 const categories = [
   { name: "Normal", count: "1,579", percent: "27.1%", color: "#8fae78" },
@@ -49,6 +51,19 @@ const categories = [
     </svg>
     <p class="media-caption">Three-seed validation means and a 95% paired-bootstrap interval. Independent external performance remains unmeasured.</p>
   </div>
+  <div v-else-if="kind === 'decision'" class="final-decision-chart">
+    <p class="decision-chart-label">MACRO F1 · SAME SEED, SAME 874 VALIDATION IMAGES</p>
+    <div class="matched-score-rows">
+      <div v-for="model in matchedSeedScores" :key="model.id" class="matched-score-row" :class="{ 'selected-score': model.selected }">
+        <div class="matched-score-heading"><strong>{{ model.id }}</strong><span>{{ model.score.toFixed(3) }}<small>%</small></span></div>
+        <div class="matched-score-track" role="meter" :aria-label="`${model.id}: ${model.detail}; seed-42 validation macro F1`" :aria-valuenow="model.score" aria-valuemin="0" aria-valuemax="100"><span :style="{ width: `${model.score}%` }"></span></div>
+      </div>
+    </div>
+    <div class="decision-score-axis" aria-hidden="true"><span>0%</span><span>100%</span></div>
+    <div class="screening-summary"><AppIcon name="check" :size="18" /><div><strong>FT-004 retained</strong><span>Only 1 of 5 FT-011 screening checks passed.</span></div></div>
+    <div class="screening-outcomes" aria-label="Final FT-011 screening outcomes"><span v-for="gate in finalScreeningGates" :key="gate.label" :class="{ passed: gate.passed }"><b>{{ gate.passed ? '✓' : '×' }}</b>{{ gate.label }}</span></div>
+    <p class="media-caption">Seed 42 only. These are validation scores, not three-seed means or external-test performance. Full thresholds are in the linked final report.</p>
+  </div>
 </template>
 
 <style scoped>
@@ -64,5 +79,27 @@ const categories = [
 .uncertainty-chart .comparison-scores>div {padding:14px;gap:6px;}
 .uncertainty-chart .interval-heading {margin:16px 0 10px;}
 .uncertainty-chart svg {max-height:145px;}
+.decision-chart-label {margin:0 0 18px;color:#7c8f71;font-size:8px;letter-spacing:.9px;line-height:1.7;}
+.matched-score-rows {display:grid;gap:16px;}
+.matched-score-heading {display:flex;justify-content:space-between;align-items:baseline;gap:12px;color:#5b7055;}
+.matched-score-heading>strong {font-size:12px;font-weight:600;}
+.matched-score-heading>span {font:600 22px 'Manrope',sans-serif;letter-spacing:-.6px;font-variant-numeric:tabular-nums;}
+.matched-score-heading small {font-size:11px;margin-left:2px;}
+.matched-score-track {height:10px;margin-top:8px;overflow:hidden;border-radius:4px;background:#dce5d3;}
+.matched-score-track>span {display:block;height:100%;background:#a5b891;border-radius:4px;transform-origin:left;animation:decision-bar 650ms cubic-bezier(.2,.7,.2,1) both;}
+.selected-score .matched-score-heading {color:#315f42;}
+.selected-score .matched-score-track>span {background:#3b735d;}
+.matched-score-row:last-child .matched-score-track>span {background:#baa776;}
+.decision-score-axis {display:flex;justify-content:space-between;margin-top:7px;color:#8a9a7d;font-size:8px;}
+.screening-summary {display:flex;align-items:center;gap:10px;padding:13px 14px;margin-top:18px;background:#e5efdc;border:1px solid #c5d6b8;border-radius:8px;color:#416944;}
+.screening-summary>div {display:grid;gap:4px;}
+.screening-summary strong {font-size:12px;font-weight:600;}
+.screening-summary span {font-size:9px;color:#68825b;}
+.screening-outcomes {display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+.screening-outcomes>span {display:inline-flex;align-items:center;gap:5px;padding:5px 7px;border-radius:5px;background:#f1ebde;color:#927844;font-size:8px;}
+.screening-outcomes>span.passed {background:#e4edda;color:#53714c;}
+.screening-outcomes b {font-size:11px;}
+@keyframes decision-bar {from {transform:scaleX(0);} to {transform:scaleX(1);}}
+@media (prefers-reduced-motion:reduce) {.matched-score-track>span {animation:none;}}
 .presentation-anatomy :deep(.anatomy-top) {margin:15px 18px 0;}.presentation-anatomy :deep(.anatomy-title) {display:none;}.presentation-anatomy :deep(.anatomy-modes) {top:39px;right:15px;}.presentation-anatomy :deep(.anatomy-stage) {min-height:0;margin-top:0;}.presentation-anatomy :deep(.lung-canvas) {inset:0 0 24px;}.presentation-anatomy :deep(.anatomy-label) {display:none;}.presentation-anatomy :deep(.scan-readout) {bottom:0;}.presentation-anatomy :deep(.scan-preview-row) {margin:8px 18px 0;padding-top:7px;}.presentation-anatomy :deep(.viewer-bottom) {height:42px;margin:0 18px;}.presentation-anatomy :deep(.orbital) {width:220px;height:220px;}.presentation-anatomy :deep(.viewer-controls button) {min-width:25px;padding:5px;}.presentation-anatomy :deep(.drag-hint) {font-size:9px;}
 </style>

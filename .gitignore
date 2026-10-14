@@ -8,3 +8,14 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 app/static/
+.tools/
+.python/
+.cache/
+.staging/
+**/*.tsbuildinfo
+ops/standalone-20261008/*.headers
+ops/standalone-20261008/public-prediction*.json
+model/artifacts/ft004/*.pt
+.venv-ft004/
+.venv-previous-*/
+model/artifacts/ft004/*.download

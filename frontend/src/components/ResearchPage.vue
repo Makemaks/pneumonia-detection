@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import AppIcon from "./AppIcon.vue";
 import ResearchPresentation from "./ResearchPresentation.vue";
 import {
   demoBoundary,
+  finalDecisionSummary,
+  finalScreeningGates,
   researchDocuments,
   researchIntro,
   researchModels,
@@ -11,16 +12,13 @@ import {
   researchSteps,
 } from "../content/researchContent";
 
-const trainingModel = computed(() =>
-  researchModels.find((model) => /training|in progress/i.test(model.status)),
-);
-
 function sourceLabel(id: number) {
   const source = researchSources.find((item) => item.id === id);
   return source ? `Reference ${id}: ${source.title}` : `Reference ${id}`;
 }
 
 function modelStatusClass(status: string) {
+  if (/not selected/i.test(status)) return "model-alternative";
   if (/training|pending|in progress/i.test(status)) return "model-pending";
   if (/selected|incumbent|frozen/i.test(status)) return "model-selected";
   return "model-alternative";
@@ -54,7 +52,7 @@ function modelStatusClass(status: string) {
       <span class="demo-note-icon"><AppIcon name="info" :size="20" /></span>
       <div>
         <h2 id="demo-note-title">About this demo</h2>
-        <p>{{ demoBoundary }}</p>
+        <p>{{ demoBoundary }} <a href="#research-source-14" :aria-label="sourceLabel(14)">[14]</a></p>
       </div>
     </section>
 
@@ -107,11 +105,16 @@ function modelStatusClass(status: string) {
           <p class="research-eyebrow">MODEL COMPARISON</p>
           <h2 id="research-models-title">The models and their results</h2>
         </div>
-        <div v-if="trainingModel" class="training-status">
-          <AppIcon name="clock" :size="16" />
-          <span>{{ trainingModel.id }} · {{ trainingModel.status }}</span>
+        <div class="training-status">
+          <AppIcon name="check" :size="16" />
+          <span>FT-004 selected · tuning closed</span>
         </div>
       </div>
+
+      <p class="final-decision-summary">{{ finalDecisionSummary }}
+        <a href="#research-source-12" :aria-label="sourceLabel(12)">[12]</a>
+        <a href="#research-source-13" :aria-label="sourceLabel(13)">[13]</a>
+      </p>
 
       <div class="model-grid">
         <article
@@ -137,8 +140,22 @@ function modelStatusClass(status: string) {
               <dd>{{ model.f1 }}</dd>
             </div>
           </dl>
+          <div class="model-citations">
+            <span>Sources</span>
+            <a v-for="id in model.sourceIds" :key="id" :href="`#research-source-${id}`" :aria-label="sourceLabel(id)">[{{ id }}]</a>
+          </div>
         </article>
       </div>
+
+      <details class="screening-details">
+        <summary>See FT-011's five final screening checks</summary>
+        <p>Every check had to pass before confirmation runs. Percentages below are rounded for reading; the final decision used full-precision values in the report <a href="#research-source-13" :aria-label="sourceLabel(13)">[13]</a>.</p>
+        <table>
+          <caption>FT-011 seed-42 validation screening · completed 13 October 2026</caption>
+          <thead><tr><th scope="col">Metric</th><th scope="col">FT-011 result</th><th scope="col">Required minimum</th><th scope="col">Outcome</th></tr></thead>
+          <tbody><tr v-for="gate in finalScreeningGates" :key="gate.label"><th scope="row">{{ gate.label }}</th><td>{{ gate.observed.toFixed(3) }}%</td><td>{{ gate.required.toFixed(3) }}%</td><td :class="gate.passed ? 'gate-passed' : 'gate-failed'">{{ gate.passed ? "Passed" : "Failed" }}</td></tr></tbody>
+        </table>
+      </details>
     </section>
 
     <section
@@ -226,6 +243,74 @@ function modelStatusClass(status: string) {
 </template>
 
 <style scoped>
+.final-decision-summary {
+  margin: 0 0 20px;
+  padding: 15px 18px;
+  border: 1px solid #d2e0c6;
+  border-radius: 9px;
+  background: #edf4e7;
+  color: #566f4b;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.final-decision-summary a,
+.model-citations a,
+.screening-details a,
+.demo-note a {
+  color: #39724c;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  margin-left: 4px;
+}
+.model-citations {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 13px;
+  color: #86937b;
+  font-size: 10px;
+}
+.screening-details {
+  margin-top: 18px;
+  padding: 17px 20px;
+  border: 1px solid #e0e6da;
+  border-radius: 10px;
+  background: #fafbf7;
+}
+.screening-details summary {
+  color: #54754d;
+  font-size: 12px;
+  cursor: pointer;
+}
+.screening-details>p {
+  margin: 14px 0;
+  color: #718268;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.screening-details table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #617359;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.screening-details caption {
+  padding: 10px 0;
+  text-align: left;
+  color: #879579;
+  font-size: 10px;
+}
+.screening-details th,
+.screening-details td {
+  padding: 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e2e9da;
+}
+.screening-details th { font-weight: 500; }
+.screening-details thead { background: #eef3e8; }
+.gate-passed { color: #39704c; }
+.gate-failed { color: #96763d; }
 .research-page {
   max-width: 1320px;
   margin: auto;

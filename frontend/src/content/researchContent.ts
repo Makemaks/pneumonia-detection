@@ -5,7 +5,24 @@ export const datasetSummary =
   "Our study uses the public Kermany pediatric chest X-ray dataset, with a public distribution on Kaggle. Our audit identified 5,856 readable images in the intended dataset folders; removing 32 redundant exact duplicates left 5,824 unique images.";
 
 export const demoBoundary =
-  "The interactive demo currently predicts Normal or Pneumonia using one binary model. The three-class FT-004, FT-010 and FT-011 results below belong to the documented research study. They are not performance measurements of the demo. Independent external pediatric evaluation of the selected research system remains outstanding.";
+  "The interactive demo uses the frozen FT-004 research system: three original seed-42 DenseNet-201 models average their Normal, Viral and Bacterial probabilities. These scores are model outputs, not clinical diagnoses. The reported study scores are validation results; independent external pediatric evaluation remains outstanding.";
+
+export const finalDecisionSummary =
+  "FT-011 completed on 13 October 2026. It failed four of five screening checks, so we retained FT-004 and closed this tuning phase. The next research step is independent evaluation of the frozen system.";
+
+export const matchedSeedScores = [
+  { id: "FT-004", score: 86.953, detail: "Selected three-model ensemble", selected: true },
+  { id: "FT-010", score: 85.631, detail: "Single-model control", selected: false },
+  { id: "FT-011", score: 82.028, detail: "Final candidate · not selected", selected: false },
+];
+
+export const finalScreeningGates = [
+  { label: "Macro F1", observed: 82.028, required: 86.131, passed: false },
+  { label: "Balanced accuracy", observed: 81.731, required: 85.075, passed: false },
+  { label: "Viral recall", observed: 58.296, required: 66.816, passed: false },
+  { label: "Normal recall", observed: 98.734, required: 98.312, passed: true },
+  { label: "Bacterial recall", observed: 88.164, required: 90.097, passed: false },
+];
 
 export const researchStats = [
   { value: "5,824", label: "Unique images after audit" },
@@ -40,8 +57,8 @@ export const researchSteps = [
     number: "04",
     title: "Prepare the images consistently",
     body: "We test color mapping and contrast adjustments, then resize and normalize the images for 224 × 224 model inputs. Enhancement changes the representation; it adds no new medical information.",
-    detail: "The main pipeline is VIRIDIS color mapping → Global Histogram Equalization (overall contrast) → CLAHE (local contrast). The selected ensemble also uses two simpler preparation streams. Random flips and small rotations are used during training only.",
-    sourceIds: [3, 4],
+    detail: "The main pipeline is VIRIDIS color mapping → Global Histogram Equalization (overall contrast) → CLAHE (local contrast). GE and CLAHE return grayscale replicated across RGB channels, so the final input is not colorful. The ensemble adds two simpler streams. Random flips and small rotations apply during training only.",
+    sourceIds: [3, 4, 14],
   },
   {
     number: "05",
@@ -53,9 +70,9 @@ export const researchSteps = [
   {
     number: "06",
     title: "Select, freeze and evaluate",
-    body: "FT-004 is the current selected research ensemble: three models' scores are averaged into one prediction. FT-011 is undergoing the final tuning experiment; its results are pending.",
-    detail: "FT-011 keeps FT-010's single-network setup and lowers only the backbone's initial learning rate. After the fixed selection rules are applied, we freeze the chosen system and move to evaluation on suitable independent pediatric data.",
-    sourceIds: [4, 5, 7, 8, 9, 10, 11],
+    body: "FT-011 completed the final comparison and failed four of five screening checks. We retained the frozen FT-004 ensemble and closed this tuning phase. The demo now uses its three-class prediction flow.",
+    detail: "Each prediction uses the three original seed-42 models, one per preparation stream, with equal probability averaging. Confirmation at three seeds measured repeatability; it did not create a nine-network deployment. Independent pediatric evaluation is the next research phase.",
+    sourceIds: [4, 8, 9, 10, 11, 12, 13, 14],
   },
 ];
 
@@ -65,9 +82,10 @@ export const researchModels = [
     title: "Preprocessing ensemble",
     networks: "Three DenseNet-201 models",
     f1: "85.305% · three-seed mean",
-    status: "Current research selection",
+    status: "Selected · frozen FT-004",
+    sourceIds: [4, 14],
     description:
-      "Three separately trained models examine differently prepared versions of the same X-ray. Their Normal, Viral and Bacterial probability scores are averaged equally. Its 0.276-point mean lead over FT-010 remains statistically uncertain on this validation cohort.",
+      "Three separately trained models examine differently prepared versions of the same X-ray. Their Normal, Viral and Bacterial scores are averaged equally. We deploy the original three seed-42 checkpoints. Its 0.276-point three-seed mean lead over FT-010 remains statistically uncertain on this validation cohort.",
   },
   {
     id: "FT-010",
@@ -75,6 +93,7 @@ export const researchModels = [
     networks: "One DenseNet-201 model",
     f1: "85.029% · three-seed mean",
     status: "Completed comparison",
+    sourceIds: [4],
     description:
       "The strongest confirmed single-network alternative uses the main image pipeline and label smoothing of 0.05. It is the matched control for FT-011 and requires one network for each prediction.",
   },
@@ -82,10 +101,11 @@ export const researchModels = [
     id: "FT-011",
     title: "Final learning-rate experiment",
     networks: "One DenseNet-201 model",
-    f1: "Pending",
-    status: "Training in progress",
+    f1: "82.028% · seed 42 only",
+    status: "Completed · not selected",
+    sourceIds: [12, 13],
     description:
-      "We retain FT-010's setup and use a smaller initial learning rate for the pretrained backbone: 0.00001 rather than 0.0001. The classifier stays at 0.0001. All layers remain trainable; selection waits for the fixed screening and confirmation rules.",
+      "The smaller backbone learning rate did not pass the fixed screening checks. Only Normal recall passed; macro F1, balanced accuracy, Viral recall and Bacterial recall failed. Training selected epoch 5 and stopped at epoch 9. Seeds 123 and 2026 were not run, as required after a screening failure.",
   },
 ];
 
@@ -105,11 +125,18 @@ export const researchDocuments = [
     url: "https://docs.google.com/document/d/1mdLbxZMtv2icHKNs-VSjpZiWb5_2lG-S/edit",
   },
   {
-    title: "FT-011 final tuning record",
+    title: "FT-011 final report and decision",
     description:
-      "Why we chose one final experiment, the learning-rate change, fixed decision rules and a citation matrix explaining each source's contribution.",
-    status: "Training in progress · results pending",
-    url: "https://docs.google.com/document/d/15m0nbeDkg9mOR14nv6e6ugqWiczRaeiC5C2ijUdpRz0/edit",
+      "Completed training history, exact screening gates, matched seed-42 comparisons and the terminal decision to retain FT-004. Includes the final graphs and numbered references.",
+    status: "Completed 13 October 2026 · tuning closed",
+    url: "https://github.com/Gerdoo2001/ai-research/blob/7a90abfa3695f61a17e4a2dd959c0da822080b21/model/docs/fine_tuning/FT011_Final_Report_20261013.md",
+  },
+  {
+    title: "Frozen FT-004 model package",
+    description:
+      "The three original seed-42 checkpoints, verified file hashes, deterministic preparation streams and equal probability-averaging inference rule used by this demo.",
+    status: "Selected research model · published package",
+    url: "https://github.com/Gerdoo2001/ai-research/tree/7a90abfa3695f61a17e4a2dd959c0da822080b21/model/artifacts/ft004",
   },
 ];
 
@@ -148,11 +175,11 @@ export const researchSources = [
   },
   {
     id: 5,
-    title: "FT-011 Final Tuning Experiment Record and Selection Rationale",
+    title: "FT-011 final tuning protocol and selection rationale",
     authors: "Project research record",
-    year: "Training in progress",
+    year: "2026 · historical protocol",
     url: "https://docs.google.com/document/d/15m0nbeDkg9mOR14nv6e6ugqWiczRaeiC5C2ijUdpRz0/edit",
-    takeaway: "Our final experiment's settings and selection rules. Exact rates, margins and the stopping point are project choices; no FT-011 performance result is reported yet.",
+    takeaway: "Why one final learning-rate comparison was planned, with fixed selection rules. Read the completed final report and terminal status for the actual outcome; this earlier document records the plan.",
   },
   {
     id: 6,
@@ -201,5 +228,29 @@ export const researchSources = [
     year: "2024",
     url: "https://www.bmj.com/content/384/bmj-2023-074820",
     takeaway: "Supports applying the frozen model to suitable independent data, with reliable labels and uncertainty estimates. Independent evaluation remains the next research phase.",
+  },
+  {
+    id: 12,
+    title: "Current status: FT-011 complete, retain FT-004",
+    authors: "Project research record · ai-research · pinned publication 7a90abf",
+    year: "13 October 2026",
+    url: "https://github.com/Gerdoo2001/ai-research/blob/7a90abfa3695f61a17e4a2dd959c0da822080b21/model/docs/CURRENT_STATUS.md",
+    takeaway: "Establishes the terminal status: FT-011 failed four of five seed-42 gates, confirmation seeds were not run, FT-004 was retained and this tuning phase is closed. Independent evaluation remains outstanding.",
+  },
+  {
+    id: 13,
+    title: "FT-011 Final Controlled Experiment and Selected Model",
+    authors: "Project research report · ai-research · pinned publication 7a90abf",
+    year: "13 October 2026",
+    url: "https://github.com/Gerdoo2001/ai-research/blob/7a90abfa3695f61a17e4a2dd959c0da822080b21/model/docs/fine_tuning/FT011_Final_Report_20261013.md",
+    takeaway: "Supplies the completed training history, full-precision decision thresholds, matched seed-42 validation scores and comparison uncertainty. It distinguishes single-seed results from three-seed means and reports the retained three-model system.",
+  },
+  {
+    id: 14,
+    title: "Frozen FT-004 research model: publication and inference package",
+    authors: "Project model package · ai-research · original frozen seed-42 checkpoints",
+    year: "Published 14 October 2026",
+    url: "https://github.com/Gerdoo2001/ai-research/blob/7a90abfa3695f61a17e4a2dd959c0da822080b21/model/artifacts/ft004/README.md",
+    takeaway: "Specifies the three preparation streams, class order, verified checkpoints and equal probability averaging used by this demo. The original weights are preserved; package publication does not establish clinical readiness or external performance.",
   },
 ];

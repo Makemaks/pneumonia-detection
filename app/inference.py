@@ -1,109 +1,107 @@
+"""Serve the frozen FT-004 ensemble using its published inference implementation."""
+
+import hashlib
+import json
 import os
-import numpy as np
-import cv2
-from PIL import Image
+import threading
 from pathlib import Path
 
-os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")
-import tensorflow as tf
+from PIL import Image
 
-# ==============================
-# CONFIGURATION
-# ==============================
-IMG_SIZE = 224
-
-# Compute absolute base directory (repo root)
 BASE_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL_PATH = BASE_DIR / "model" / "outputs" / "binary" / "v2" / "densenet201" / "densenet201_pneumonia.h5"
-MODEL_PATH = os.environ.get(
-    "MODEL_PATH",
-    str(DEFAULT_MODEL_PATH),
-)
-
+MODEL_VERSION = "7a90abfa3695f61a17e4a2dd959c0da822080b21"
+CLASS_ORDER = ("NORMAL", "VIRAL", "BACTERIAL")
+SELECTION_PATH = Path(os.environ.get(
+    "FT004_SELECTION_PATH", str(BASE_DIR / "model/artifacts/ft004/selection.json")
+))
 _model = None
+_load_lock = threading.Lock()
+_prediction_lock = threading.Lock()
 
 
-# ==============================
-# CLAHE ENHANCEMENT
-# ==============================
-def apply_clahe(np_img: np.ndarray) -> np.ndarray:
-    """Apply CLAHE to improve local contrast before prediction."""
-    # Convert RGB to LAB color space
-    lab = cv2.cvtColor(np_img, cv2.COLOR_RGB2LAB)
-    l, a, b = cv2.split(lab)
-
-    # Apply CLAHE to the L-channel (brightness)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    cl = clahe.apply(l)
-
-    # Merge back and convert to RGB
-    merged = cv2.merge((cl, a, b))
-    enhanced = cv2.cvtColor(merged, cv2.COLOR_LAB2RGB)
-    return enhanced
+class InferenceBusyError(RuntimeError):
+    """The bounded CPU worker is already processing another image."""
 
 
-# ==============================
-# MODEL LOADING
-# ==============================
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_package(selection_path: Path = SELECTION_PATH) -> dict:
+    """Reject pointer files, modified package metadata and changed member ordering."""
+    provenance = json.loads((Path(__file__).parent / "ft004/provenance.json").read_text())
+    for name, expected_hash in provenance["files"].items():
+        if _sha256(Path(__file__).parent / "ft004" / name) != expected_hash:
+            raise RuntimeError(f"FT-004 published inference source changed: {name}")
+    manifest_path = selection_path.parent / "package_manifest.json"
+    if _sha256(manifest_path) != provenance["package_manifest_sha256"]:
+        raise RuntimeError("FT-004 package manifest does not match the pinned publication")
+    manifest = json.loads(manifest_path.read_text())
+    if _sha256(selection_path) != manifest["files"]["selection.json"]["sha256"]:
+        raise RuntimeError("FT-004 selection does not match the frozen published descriptor")
+    for name, expected in manifest["files"].items():
+        path = selection_path.parent / name
+        if not path.is_file():
+            raise FileNotFoundError(f"Missing FT-004 artifact: {name}")
+        if path.stat().st_size != expected["size_bytes"] or _sha256(path) != expected["sha256"]:
+            raise RuntimeError(f"FT-004 artifact integrity check failed: {name}")
+    selection = json.loads(selection_path.read_text())
+    members = selection.get("members", [])
+    if len(members) != 3 or sorted(member["member_order"] for member in members) != [1, 2, 3]:
+        raise RuntimeError("FT-004 requires three unique ordered members")
+    if selection.get("deployable_seed") != 42 or any(member["seed"] != 42 for member in members):
+        raise RuntimeError("FT-004 requires the original frozen seed-42 checkpoints")
+    return selection
+
+
 def load_model():
-    """Load DenseNet121 model (cached after first call)."""
     global _model
-    if _model is None:
-        if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(f"Model file not found at: {MODEL_PATH}")
-        print(f"Loading model from {MODEL_PATH} ...")
-        _model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-        print("Model loaded successfully.")
+    with _load_lock:
+        if _model is None:
+            verify_package()
+            import cv2
+            import torch
+            from app.ft004.inference import FT004EnsemblePredictor
+
+            torch.set_num_threads(1)
+            if torch.get_num_interop_threads() != 1:
+                torch.set_num_interop_threads(1)
+            cv2.setNumThreads(1)
+            _model = FT004EnsemblePredictor(SELECTION_PATH, device="cpu")
+            print(f"FT-004 loaded: three verified seed-42 DenseNet201 members; source {MODEL_VERSION}.")
     return _model
 
 
-# ==============================
-# PREPROCESS IMAGE
-# ==============================
-def preprocess_image(pil_img: Image.Image) -> np.ndarray:
-    """
-    Convert PIL image → NumPy RGB → apply CLAHE → resize → normalize.
-    """
-    # Convert to RGB NumPy
-    img = np.array(pil_img.convert("RGB"))
-
-    # Apply CLAHE enhancement
-    img = apply_clahe(img)
-
-    # Resize to model input
-    img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
-
-    # Normalize [0,1]
-    x = img.astype("float32") / 255.0
-
-    # Add batch dimension
-    x = np.expand_dims(x, axis=0)
-    return x
-
-
-# ==============================
-# PREDICT FUNCTION
-# ==============================
-def predict(pil_img: Image.Image, threshold: float = 0.5):
-    """Predict pneumonia from chest X-ray."""
-    model = load_model()
-    x = preprocess_image(pil_img)
-    prob = float(model.predict(x, verbose=0)[0][0])
-    label = "PNEUMONIA" if prob >= threshold else "NORMAL"
-
-    result = {
-        "label": label,
-        "probability": prob,
-        "threshold": threshold,
+def model_status() -> dict:
+    return {
+        "status": "ok" if _model is not None else "starting",
+        "model": "FT-004",
+        "model_version": MODEL_VERSION,
+        "member_count": 3,
+        "class_order": list(CLASS_ORDER),
+        "research_use_only": True,
     }
 
-    # Print result in the terminal for debugging and monitoring.
-    print("\n==============================")
-    print("AI Lung Analyzer Prediction Result")
-    print("==============================")
-    print(f"Label: {label}")
-    print(f"Probability: {prob:.4f}")
-    print(f"Threshold: {threshold}")
-    print("==============================\n")
 
-    return result
+def predict(pil_img: Image.Image) -> dict:
+    if not _prediction_lock.acquire(blocking=False):
+        raise InferenceBusyError("The analysis service is busy. Please retry in a moment.")
+    try:
+        output = load_model().predict(pil_img)
+        probabilities = {
+            name.upper(): float(score) for name, score in output["class_probabilities"].items()
+        }
+        return {
+            "model": "FT-004",
+            "model_version": MODEL_VERSION,
+            "label": output["predicted_class"].upper(),
+            "probabilities": probabilities,
+            "class_order": list(CLASS_ORDER),
+            "member_count": 3,
+        }
+    finally:
+        _prediction_lock.release()

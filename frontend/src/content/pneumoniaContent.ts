@@ -53,22 +53,22 @@ export const pneumoniaFacts: FactCard[] = [
 export const workflowSteps: WorkflowStep[] = [
   {
     title: "Upload",
-    body: "The app accepts a chest X-ray image in JPEG or PNG format and sends it to the FastAPI backend.",
+    body: "Choose one chest X-ray in JPEG or PNG format. Select Analyze to send it to the analysis service.",
     icon: "pi pi-upload",
   },
   {
     title: "Preprocess",
-    body: "The backend converts the image to RGB, applies CLAHE contrast enhancement, resizes it, and normalizes pixel values.",
+    body: "The service prepares the three image views recorded for FT-004, one for each trained DenseNet201 model.",
     icon: "pi pi-sliders-h",
   },
   {
     title: "Predict",
-    body: "The DenseNet201 binary classifier returns a pneumonia probability and a threshold-based label.",
+    body: "FT-004 averages the three models’ Normal, Viral Pneumonia and Bacterial Pneumonia scores equally, then selects the highest class score.",
     icon: "pi pi-chart-line",
   },
   {
     title: "Review",
-    body: "The UI displays the result with confidence, status messaging, and a clear research-use safety note.",
+    body: "Review the predicted pattern and all three model scores. The research result is not a diagnosis and needs clinical interpretation.",
     icon: "pi pi-check-circle",
   },
 ];

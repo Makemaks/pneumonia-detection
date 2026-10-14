@@ -6,3 +6,14 @@ frontend/dist
 frontend/.vite
 *.log
 .env
+.venv
+venv
+.tools
+.python
+.cache
+.staging
+ops
+app/static
+.venv-previous-*
+.venv-ft004
+**/*.tsbuildinfo
