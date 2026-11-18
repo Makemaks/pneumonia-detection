@@ -36,8 +36,8 @@ cp "$release/compose.after.yaml" "$compose"
 docker compose -f "$compose" up -d --no-build --no-deps --wait --wait-timeout 180 app
 docker exec -i pneumonia_app python - http://127.0.0.1:8000 \
   < "$release/ops/doctor_selector/verify.py" > "$release/live-http-verification.json"
-python3 "$release/ops/doctor_selector/verify.py" https://pneumoniadetection.xyz \
-  > "$release/public-http-verification.json"
+docker exec -i pneumonia_app python - https://pneumoniadetection.xyz \
+  < "$release/ops/doctor_selector/verify.py" > "$release/public-http-verification.json"
 curl --fail --silent --show-error --max-time 15 https://pneumoniadetection.xyz/ > "$release/public-index.html"
 cmp "$release/frontend/dist/index.html" "$release/public-index.html"
 docker ps --format '{{.ID}} {{.Names}}' | awk '$2 != "pneumonia_app" && $2 != "pneumonia_doctor_candidate"' | sort > "$release/other-containers.after"

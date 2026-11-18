@@ -1,5 +1,6 @@
 """Integration checks on an artificial PNG only, never a patient/test image."""
 import io
+from contextlib import redirect_stdout
 import json
 import math
 import sys
@@ -48,11 +49,13 @@ def main():
         import torch
         from app import inference
         from app.schemas import PredictionResponse
-        inference.initialize_models()
+        with redirect_stdout(sys.stderr):
+            inference.initialize_models()
         assert {row["source"] for row in inference.models_status()["models"] if row["available"]} == set(CATALOG)
         for source in ("kaggle", "doctor", "kaggle"):
             start = time.monotonic()
-            result = inference.predict(image, source)
+            with redirect_stdout(sys.stderr):
+                result = inference.predict(image, source)
             check(result, source)
             PredictionResponse(**result)
             if source == "doctor":
