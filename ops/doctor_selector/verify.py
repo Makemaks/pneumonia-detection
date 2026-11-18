@@ -16,6 +16,7 @@ CATALOG = {
     "doctor": ("DOCTOR-SHARED-701515", "4484aef80293d996944f20a04774ae2ec57a11ffd8272b8c942a72178291e5e2"),
 }
 CLASSES = ["NORMAL", "VIRAL", "BACTERIAL"]
+BUSY_RETRIES = 0
 
 
 def check(result, source):
@@ -30,14 +31,29 @@ def check(result, source):
 
 
 def post(base, source, png):
+    global BUSY_RETRIES
     boundary = "pulmo-check-" + uuid.uuid4().hex
     body = (f'--{boundary}\r\nContent-Disposition: form-data; name="model_source"\r\n\r\n{source}\r\n'
             f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="artificial-smoke.png"\r\n'
             'Content-Type: image/png\r\n\r\n').encode() + png + f"\r\n--{boundary}--\r\n".encode()
     request = urllib.request.Request(base + "/predict", data=body,
                                     headers={"Content-Type": "multipart/form-data; boundary=" + boundary})
-    with urllib.request.urlopen(request, timeout=150) as response:
-        return json.load(response)
+    for attempt in range(12):
+        try:
+            with urllib.request.urlopen(request, timeout=150) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as error:
+            # Respect only the serving API's explicit busy/backpressure signal;
+            # unavailable models (no Retry-After), 4xx and 5xx still fail closed.
+            retry = error.headers.get("Retry-After")
+            if error.code != 503 or retry is None or attempt == 11:
+                raise
+            try:
+                delay = min(5.0, max(1.0, float(retry)))
+            except ValueError:
+                raise
+            BUSY_RETRIES += 1
+            time.sleep(delay)
 
 
 def main():
@@ -108,7 +124,7 @@ def main():
     except urllib.error.HTTPError as error:
         assert error.code == 422, error.code
     print(json.dumps({"verified": True, "input": "artificial uniform PNG only",
-                      "accuracy_measurement": False, "checks": records}))
+                      "accuracy_measurement": False, "busy_retries": BUSY_RETRIES, "checks": records}))
 
 
 if __name__ == "__main__":
