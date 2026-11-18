@@ -3,12 +3,13 @@ import io
 from contextlib import redirect_stdout
 import json
 import math
+import struct
 import sys
 import time
 import urllib.error
 import urllib.request
 import uuid
-from PIL import Image
+import zlib
 
 CATALOG = {
     "kaggle": ("FT-004", "7a90abfa3695f61a17e4a2dd959c0da822080b21"),
@@ -40,15 +41,20 @@ def post(base, source, png):
 
 
 def main():
-    image = Image.new("RGB", (128, 160), (128, 128, 128))
-    stream = io.BytesIO()
-    image.save(stream, format="PNG")
+    # A valid artificial PNG made with the standard library. HTTP checks can
+    # run outside the serving container without installing packages on EC2.
+    def chunk(kind, payload):
+        return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload))
+    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 128, 160, 8, 2, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress((b"\0" + b"\x80" * (128 * 3)) * 160)) + chunk(b"IEND", b""))
     records = []
     if "--model" in sys.argv:
         import numpy as np
         import torch
+        from PIL import Image
         from app import inference
         from app.schemas import PredictionResponse
+        image = Image.open(io.BytesIO(png))
         with redirect_stdout(sys.stderr):
             inference.initialize_models()
         assert {row["source"] for row in inference.models_status()["models"] if row["available"]} == set(CATALOG)
@@ -90,14 +96,14 @@ def main():
     assert {row["source"] for row in models["models"] if row["available"]} == set(CATALOG), models
     for source in ("kaggle", "doctor", "kaggle"):
         start = time.monotonic()
-        result = post(base, source, stream.getvalue())
+        result = post(base, source, png)
         check(result, source)
         with urllib.request.urlopen(base + "/models", timeout=10) as response:
             state = json.load(response)
         assert [r["source"] for r in state["models"] if r["loaded"]] == [source], state
         records.append({"source": source, "elapsed_seconds": time.monotonic() - start, "result": result})
     try:
-        post(base, "invalid-source", stream.getvalue())
+        post(base, "invalid-source", png)
         raise AssertionError("Unknown model source was not rejected")
     except urllib.error.HTTPError as error:
         assert error.code == 422, error.code

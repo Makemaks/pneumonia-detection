@@ -2,9 +2,11 @@
 
 import hashlib
 import gc
+import ctypes
 import json
 import os
 import threading
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -67,6 +69,23 @@ def verify_package(selection_path: Path = SELECTION_PATH) -> dict:
     return selection
 
 
+def release_unused_memory():
+    """Return unused glibc arenas after a threaded CPU model switch.
+
+    Freeing Python/Torch references alone can leave prior weight allocations
+    in thread-specific malloc arenas. Keep the existing 1 GiB service limit.
+    """
+    gc.collect()
+    if sys.platform.startswith("linux"):
+        try:
+            trim = ctypes.CDLL(None).malloc_trim
+            trim.argtypes = [ctypes.c_size_t]
+            trim.restype = ctypes.c_int
+            trim(0)
+        except (AttributeError, OSError):
+            pass
+
+
 def _create_predictor(model_source):
     import cv2
     import torch
@@ -92,7 +111,7 @@ def load_model(model_source="kaggle"):
         if _model is not None and _active_source not in (None, model_source):
             _model = None
             _active_source = None
-            gc.collect()
+            release_unused_memory()
         if _model is None:
             try:
                 _model = _create_predictor(model_source)
@@ -100,10 +119,11 @@ def load_model(model_source="kaggle"):
                 _model = None
                 _active_source = None
                 _verified_sources.discard(model_source)
-                gc.collect()
+                release_unused_memory()
                 raise ModelUnavailableError("Requested research model is unavailable") from None
             _active_source = model_source
             _verified_sources.add(model_source)
+            release_unused_memory()
             print(f"Verified research model loaded: {model_source}; three DenseNet201 members.")
     return _model
 
@@ -157,7 +177,7 @@ def predict(pil_img: Image.Image, model_source="kaggle") -> dict:
             _model = None
             _active_source = None
             _verified_sources.discard(model_source)
-            gc.collect()
+            release_unused_memory()
             raise
         probabilities = {
             name.upper(): float(score) for name, score in output["class_probabilities"].items()
@@ -173,4 +193,5 @@ def predict(pil_img: Image.Image, model_source="kaggle") -> dict:
             "research_use_only": True,
         }
     finally:
+        release_unused_memory()
         _prediction_lock.release()

@@ -57,3 +57,12 @@ Vue server-renderer and source-map/build dependencies. This scoped selector
 release preserves the existing dependency versions; framework/security
 upgrades require a separate tested change. Successful unit/build checks do
 not imply a clean dependency security audit.
+
+The first candidate (c81c079) passed single-process reference checks but hit
+the 1 GiB container memory ceiling during HTTP doctor-to-Kaggle switching.
+It was never activated publicly. The corrected adapter explicitly returns
+unused glibc arenas after freeing old weights and after predictions, keeping
+the same resource limits. HTTP verification runs outside the serving
+container using a standard-library-generated artificial PNG, avoiding an
+extra client interpreter inside the server's memory budget. Failed-candidate
+logs and subsequent verification evidence remain in the EC2 release record.
