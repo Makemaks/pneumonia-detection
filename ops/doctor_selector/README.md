@@ -66,3 +66,12 @@ the same resource limits. HTTP verification runs outside the serving
 container using a standard-library-generated artificial PNG, avoiding an
 extra client interpreter inside the server's memory budget. Failed-candidate
 logs and subsequent verification evidence remain in the EC2 release record.
+
+The legacy Compose file also sees a stopped Compose-labelled backup while the
+real `pneumonia_app` is a standalone container. Compose cutover was blocked by
+the occupied name before the live container changed. `deploy_targeted.sh`
+therefore targets the verified live container ID, preserves it under an
+explicit rollback name, and creates the replacement with the same resource,
+security, loopback port and standalone network settings. It restores that
+original container automatically if checks fail. Do not use the older
+Compose cutover on this host without first reconciling its legacy backups.
