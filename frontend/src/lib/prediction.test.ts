@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CLASS_ORDER, parsePrediction, validateImage } from "./prediction.ts";
+import { CLASS_ORDER, MODEL_CATALOG, parsePrediction, validateImage } from "./prediction.ts";
 
 const version = "7a90abfa3695f61a17e4a2dd959c0da822080b21";
 const validResponse = {
@@ -11,6 +11,16 @@ const validResponse = {
   class_order: [...CLASS_ORDER],
   member_count: 3,
 };
+
+test("doctor source preserves its own model and rejects Kaggle substitution", () => {
+  const doctor = { ...validResponse, model: MODEL_CATALOG.doctor.model,
+    model_source: "doctor", model_version: MODEL_CATALOG.doctor.version };
+  assert.equal(parsePrediction(doctor, "doctor").model_source, "doctor");
+  assert.throws(() => parsePrediction(validResponse, "doctor"));
+  assert.throws(() => parsePrediction(doctor, "kaggle"));
+  assert.throws(() => parsePrediction({ ...doctor, model_source: "kaggle" }, "doctor"));
+  assert.throws(() => parsePrediction({ ...doctor, model_version: version }, "doctor"));
+});
 
 test("all three independent model scores and model provenance are preserved", () => {
   const result = parsePrediction(validResponse);

@@ -19,3 +19,4 @@ model/artifacts/ft004/*.pt
 .venv-ft004/
 .venv-previous-*/
 model/artifacts/ft004/*.download
+model/artifacts/doctor_shared_grouped_701515/*.pt

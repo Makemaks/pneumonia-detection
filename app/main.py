@@ -7,7 +7,7 @@ import io
 import asyncio
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html
 from fastapi.responses import FileResponse, JSONResponse
@@ -16,14 +16,14 @@ from PIL import Image
 from starlette.concurrency import run_in_threadpool
 import importlib.resources as pkg_resources
 
-from app.schemas import PredictionResponse
-from app.inference import predict, load_model, model_status, InferenceBusyError
+from app.schemas import PredictionResponse, ModelSource
+from app.inference import predict, initialize_models, model_status, models_status, InferenceBusyError, ModelUnavailableError
 
 
 # =====================================================
 # FastAPI app config
 # =====================================================
-app = FastAPI(title="FT-004 Chest X-ray Research API", version="2.0.0")
+app = FastAPI(title="Pulmo Dataset Comparison Research API", version="2.1.0")
 analysis_gate = asyncio.Lock()
 
 app.add_middleware(
@@ -78,7 +78,7 @@ async def swagger_redirect():
 @app.on_event("startup")
 def warmup():
     # A failed checkpoint verification must prevent an apparently healthy service.
-    load_model()
+    initialize_models()
 
 
 # =====================================================
@@ -91,15 +91,18 @@ def health():
 
 
 @app.post("/predict", response_model=PredictionResponse)
-async def predict_endpoint(file: UploadFile = File(...)):
+async def predict_endpoint(file: UploadFile = File(...), model_source: ModelSource = Form("kaggle")):
     # Keep full-resolution decoding bounded as well as model inference.
-    if analysis_gate.locked():
-        raise HTTPException(status_code=503, detail="The analysis service is busy. Please retry in a moment.", headers={"Retry-After": "2"})
-    async with analysis_gate:
-        return await analyze_upload(file)
+    try:
+        if analysis_gate.locked():
+            raise HTTPException(status_code=503, detail="The analysis service is busy. Please retry in a moment.", headers={"Retry-After": "2"})
+        async with analysis_gate:
+            return await analyze_upload(file, model_source)
+    finally:
+        await file.close()
 
 
-async def analyze_upload(file: UploadFile):
+async def analyze_upload(file: UploadFile, model_source="kaggle"):
     if file.content_type not in {"image/jpeg", "image/png"}:
         raise HTTPException(status_code=415, detail="Only JPEG or PNG images are supported.")
 
@@ -119,14 +122,23 @@ async def analyze_upload(file: UploadFile):
         raise HTTPException(status_code=400, detail="Invalid image file.")
 
     try:
-        result = await run_in_threadpool(predict, img)
+        result = await run_in_threadpool(predict, img, model_source)
+        if result.get("model_source") != model_source:
+            raise ValueError("Result source does not match requested model")
         return PredictionResponse(**result)
     except InferenceBusyError as e:
         raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": "2"})
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"Model not found: {e}")
+    except (FileNotFoundError, ModelUnavailableError):
+        raise HTTPException(status_code=503, detail="The selected research model is unavailable. No other model was substituted.") from None
     except Exception as e:
         raise HTTPException(status_code=500, detail="The analysis could not be completed.") from e
+    finally:
+        img.close()
+
+
+@app.get("/models")
+def list_models():
+    return JSONResponse(models_status(), headers={"Cache-Control": "no-store"})
 
 
 # =====================================================

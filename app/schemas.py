@@ -1,8 +1,10 @@
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
+from app.model_catalog import CATALOG
 
 ClassName = Literal["NORMAL", "VIRAL", "BACTERIAL"]
+ModelSource = Literal["kaggle", "doctor"]
 
 
 class ClassProbabilities(BaseModel):
@@ -12,8 +14,10 @@ class ClassProbabilities(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    model: Literal["FT-004"]
-    model_version: str = Field(pattern=r"^[0-9a-f]{40}$")
+    model: Literal["FT-004", "DOCTOR-SHARED-701515"]
+    model_version: str = Field(pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+    model_source: ModelSource = "kaggle"
+    research_use_only: Literal[True] = True
     label: ClassName
     probabilities: ClassProbabilities
     class_order: tuple[Literal["NORMAL"], Literal["VIRAL"], Literal["BACTERIAL"]]
@@ -21,6 +25,9 @@ class PredictionResponse(BaseModel):
 
     @model_validator(mode="after")
     def check_prediction(self):
+        expected = CATALOG[self.model_source]
+        if self.model != expected["model"] or self.model_version != expected["model_version"]:
+            raise ValueError("Result identity must match the requested dataset model")
         scores = self.probabilities.model_dump()
         if abs(sum(scores.values()) - 1) > 1e-5:
             raise ValueError("Class probabilities must sum to one")

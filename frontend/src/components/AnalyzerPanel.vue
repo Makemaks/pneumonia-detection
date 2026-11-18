@@ -5,10 +5,12 @@ import LungViewer from "./LungViewer.vue";
 import ResultCard from "./ResultCard.vue";
 import {
   CLASS_ORDER,
+  MODEL_CATALOG,
   PREDICTION_LABELS,
   parsePrediction,
   validateImage,
   type PredictionResult,
+  type ModelSource,
 } from "../lib/prediction";
 
 const selectedFile = ref<File | null>(null);
@@ -26,6 +28,8 @@ const error = ref("");
 const dragDepth = ref(0);
 const elapsed = ref(0);
 const connection = ref<"checking" | "connected" | "offline">("checking");
+const modelSource = ref<ModelSource>("kaggle");
+const doctorAvailable = ref(false);
 let request: AbortController | null = null;
 let healthRequest: AbortController | null = null;
 let elapsedTimer: ReturnType<typeof setInterval> | undefined;
@@ -68,6 +72,12 @@ async function checkConnection() {
         data.class_order.length === CLASS_ORDER.length &&
         CLASS_ORDER.every((label, index) => data.class_order[index] === label)
           ? "connected" : "offline";
+    const modelsResponse = await fetch("/models", { signal: controller.signal, cache: "no-store" });
+    const models = await modelsResponse.json();
+    if (controller === healthRequest && !disposed)
+      doctorAvailable.value = modelsResponse.ok && Array.isArray(models.models) && models.models.some(
+        (item: Record<string, unknown>) => item.source === "doctor" && item.available === true &&
+          item.model === MODEL_CATALOG.doctor.model && item.model_version === MODEL_CATALOG.doctor.version);
   } catch {
     if (controller === healthRequest && !disposed) connection.value = "offline";
   } finally {
@@ -106,6 +116,13 @@ function reset() {
   validating.value = false;
   if (fileInput.value) fileInput.value.value = "";
   void nextTick(() => browseButton.value?.focus({ preventScroll: true }));
+}
+function changeModel() {
+  // Keep the selected preview, but never show an old source's result as new.
+  cancel();
+  result.value = null;
+  resultOpen.value = false;
+  error.value = "";
 }
 async function chooseFile(file?: File) {
   if (!file || loading.value) return;
@@ -159,6 +176,7 @@ async function analyze() {
   loading.value = true;
   elapsed.value = 0;
   const controller = new AbortController();
+  const requestedSource = modelSource.value;
   request = controller;
   let timedOut = false;
   const started = Date.now();
@@ -172,12 +190,15 @@ async function analyze() {
   try {
     const body = new FormData();
     body.append("file", selectedFile.value);
+    body.append("model_source", requestedSource);
     const response = await fetch("/predict", {
       method: "POST",
       body,
       signal: controller.signal,
     });
     if (!response.ok) {
+      if (response.status === 503)
+        throw new Error("The selected model is busy or unavailable. No other dataset model was substituted. Please retry shortly.");
       if (response.status === 413)
         throw new Error(
           "The server could not accept this image. Try a smaller file.",
@@ -190,7 +211,7 @@ async function analyze() {
         "The analysis service could not complete the request. Please try again in a moment.",
       );
     }
-    const data = parsePrediction(await response.json());
+    const data = parsePrediction(await response.json(), requestedSource);
     if (request !== controller || disposed) return;
     result.value = data;
     completedAt.value = new Date().toISOString();
@@ -241,6 +262,16 @@ onBeforeUnmount(() => {
           }}<AppIcon v-if="connection === 'offline'" name="rotate" :size="12" />
         </button>
       </div>
+      <div class="model-choice">
+        <label for="model-source">Choose training dataset</label>
+        <select id="model-source" v-model="modelSource" :disabled="busy" @change="changeModel">
+          <option value="kaggle">Kaggle dataset — original FT-004</option>
+          <option value="doctor" :disabled="!doctorAvailable">Doctor-shared dataset — 70/15/15{{ doctorAvailable ? '' : ' (unavailable)' }}</option>
+        </select>
+        <p v-if="modelSource === 'doctor'" class="model-limitations">Exploratory research model: 300 doctor-shared public-source images. Possible Kaggle similarities and unverified patient identities mean this is not independent clinical validation.</p>
+        <p v-else>Original Kaggle-trained research ensemble. Both options classify Normal, Viral and Bacterial patterns.</p>
+        <small>One three-member ensemble is kept in memory. Switching datasets can take longer.</small>
+      </div>
       <ol class="stepper" aria-label="Analysis progress">
         <li
           v-for="(label, index) in ['Upload', 'Analyze', 'Results']"
@@ -282,7 +313,7 @@ onBeforeUnmount(() => {
           <p>
             {{
               loading
-                ? "FT-004 is comparing Normal, Viral and Bacterial patterns."
+                ? `${modelSource === 'doctor' ? 'The doctor-shared model' : 'FT-004'} is comparing Normal, Viral and Bacterial patterns.`
                 : selectedFile
                   ? "Review your image, then start the analysis."
                   : "A single image. A new layer of insight."
@@ -432,7 +463,7 @@ onBeforeUnmount(() => {
           <p>Take a closer look at your image and the model’s findings.</p>
           <div class="completed-image">
             <img :src="previewUrl" alt="Analyzed chest X-ray thumbnail" />
-            <div><span>FT-004 MODEL PREDICTION</span><strong>{{ PREDICTION_LABELS[result.label] }} pattern</strong><small :title="selectedFile?.name">{{ selectedFile?.name }}</small></div>
+            <div><span>{{ result.model_source === 'doctor' ? 'DOCTOR-SHARED' : 'KAGGLE FT-004' }} MODEL PREDICTION</span><strong>{{ PREDICTION_LABELS[result.label] }} pattern</strong><small :title="selectedFile?.name">{{ selectedFile?.name }}</small></div>
             <AppIcon name="file" :size="19" />
           </div>
           <button ref="viewResultButton" class="analyze-button" type="button" aria-haspopup="dialog" @click="resultOpen = true"><AppIcon name="scan" :size="18" />View full results<AppIcon name="arrow" :size="18" /></button>
@@ -458,6 +489,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.model-choice { margin: 20px 0 6px; padding: 14px 16px; border: 1px solid #dfe7d8; border-radius: 10px; background: #f7faf4; }
+.model-choice label { display: block; font-size: 12px; font-weight: 600; color: #3b624d; margin-bottom: 8px; }
+.model-choice select { display: block; width: 100%; max-width: 100%; border: 1px solid #cbd9c4; border-radius: 7px; padding: 10px 9px; background: #fff; color: #304b3c; font: inherit; font-size: 12px; }
+.model-choice p,.model-choice small { display: block; font-size: 10px; line-height: 1.6; color: #62745c; margin: 8px 0 0; }
+.model-choice .model-limitations { color: #77602e; }
 .completed-analysis { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px 0 24px; text-align: center; }
 .completion-seal { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; background: #edf4e9; color: #538064; box-shadow: 0 0 0 7px #f7faf4; margin-bottom: 23px; }
 .completion-eyebrow { font-size: 9px; letter-spacing: 1.8px; color: #7b9270; }

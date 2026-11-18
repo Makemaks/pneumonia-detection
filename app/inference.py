@@ -1,12 +1,14 @@
 """Serve the frozen FT-004 ensemble using its published inference implementation."""
 
 import hashlib
+import gc
 import json
 import os
 import threading
 from pathlib import Path
 
 from PIL import Image
+from app.model_catalog import CATALOG
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 MODEL_VERSION = "7a90abfa3695f61a17e4a2dd959c0da822080b21"
@@ -15,12 +17,19 @@ SELECTION_PATH = Path(os.environ.get(
     "FT004_SELECTION_PATH", str(BASE_DIR / "model/artifacts/ft004/selection.json")
 ))
 _model = None
+_active_source = None
+_verified_sources = set()
+DOCTOR_SELECTION_PATH = BASE_DIR / "model/artifacts/doctor_shared_grouped_701515/selection.json"
 _load_lock = threading.Lock()
 _prediction_lock = threading.Lock()
 
 
 class InferenceBusyError(RuntimeError):
     """The bounded CPU worker is already processing another image."""
+
+
+class ModelUnavailableError(RuntimeError):
+    """The explicitly requested package is unavailable; no fallback is allowed."""
 
 
 def _sha256(path: Path) -> str:
@@ -58,50 +67,110 @@ def verify_package(selection_path: Path = SELECTION_PATH) -> dict:
     return selection
 
 
-def load_model():
-    global _model
-    with _load_lock:
-        if _model is None:
-            verify_package()
-            import cv2
-            import torch
-            from app.ft004.inference import FT004EnsemblePredictor
+def _create_predictor(model_source):
+    import cv2
+    import torch
 
-            torch.set_num_threads(1)
-            if torch.get_num_interop_threads() != 1:
-                torch.set_num_interop_threads(1)
-            cv2.setNumThreads(1)
-            _model = FT004EnsemblePredictor(SELECTION_PATH, device="cpu")
-            print(f"FT-004 loaded: three verified seed-42 DenseNet201 members; source {MODEL_VERSION}.")
+    torch.set_num_threads(1)
+    if torch.get_num_interop_threads() != 1:
+        torch.set_num_interop_threads(1)
+    cv2.setNumThreads(1)
+    if model_source == "kaggle":
+        verify_package()
+        from app.ft004.inference import FT004EnsemblePredictor
+        return FT004EnsemblePredictor(SELECTION_PATH, device="cpu")
+    from app.doctor.inference import DoctorGroupedEnsemblePredictor
+    return DoctorGroupedEnsemblePredictor(DOCTOR_SELECTION_PATH, device="cpu")
+
+
+def load_model(model_source="kaggle"):
+    global _model, _active_source
+    if model_source not in CATALOG:
+        raise ModelUnavailableError("Unknown model source")
+    with _load_lock:
+        # Keep only one three-member ensemble resident, even during switching.
+        if _model is not None and _active_source not in (None, model_source):
+            _model = None
+            _active_source = None
+            gc.collect()
+        if _model is None:
+            try:
+                _model = _create_predictor(model_source)
+            except Exception:
+                _model = None
+                _active_source = None
+                _verified_sources.discard(model_source)
+                gc.collect()
+                raise ModelUnavailableError("Requested research model is unavailable") from None
+            _active_source = model_source
+            _verified_sources.add(model_source)
+            print(f"Verified research model loaded: {model_source}; three DenseNet201 members.")
     return _model
+
+
+def initialize_models():
+    """Verify the doctor package without retaining six networks at startup."""
+    load_model("kaggle")
+    try:
+        from app.doctor.inference import validate_package
+        validate_package(DOCTOR_SELECTION_PATH)
+        _verified_sources.add("doctor")
+    except Exception:
+        _verified_sources.discard("doctor")
+        print("Doctor-shared research package is unavailable; Kaggle remains available.")
+
+
+def models_status():
+    # Health polling does not acquire the model lock or trigger network loads.
+    return {"default": "kaggle", "active_source": _active_source, "models": [
+        dict(source=source, available=source in _verified_sources,
+             loaded=source == _active_source and _model is not None, **metadata)
+        for source, metadata in CATALOG.items()
+    ]}
 
 
 def model_status() -> dict:
     return {
-        "status": "ok" if _model is not None else "starting",
+        "status": "ok" if "kaggle" in _verified_sources else "starting",
         "model": "FT-004",
         "model_version": MODEL_VERSION,
         "member_count": 3,
         "class_order": list(CLASS_ORDER),
         "research_use_only": True,
+        "default_model_source": "kaggle",
+        "active_model_source": _active_source,
     }
 
 
-def predict(pil_img: Image.Image) -> dict:
+def predict(pil_img: Image.Image, model_source="kaggle") -> dict:
+    global _model, _active_source
     if not _prediction_lock.acquire(blocking=False):
         raise InferenceBusyError("The analysis service is busy. Please retry in a moment.")
     try:
-        output = load_model().predict(pil_img)
+        if model_source not in CATALOG or model_source not in _verified_sources:
+            raise ModelUnavailableError("Requested research model is unavailable")
+        try:
+            output = load_model(model_source).predict(pil_img)
+        except ModelUnavailableError:
+            raise
+        except Exception:
+            _model = None
+            _active_source = None
+            _verified_sources.discard(model_source)
+            gc.collect()
+            raise
         probabilities = {
             name.upper(): float(score) for name, score in output["class_probabilities"].items()
         }
         return {
-            "model": "FT-004",
-            "model_version": MODEL_VERSION,
+            "model": CATALOG[model_source]["model"],
+            "model_version": CATALOG[model_source]["model_version"],
+            "model_source": model_source,
             "label": output["predicted_class"].upper(),
             "probabilities": probabilities,
             "class_order": list(CLASS_ORDER),
             "member_count": 3,
+            "research_use_only": True,
         }
     finally:
         _prediction_lock.release()

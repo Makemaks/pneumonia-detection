@@ -1,3 +1,7 @@
 # Frozen package and vendored code are verified byte for byte at startup.
 model/artifacts/ft004/* -text whitespace=trailing-space,space-before-tab,cr-at-eol
 app/ft004/*.py -text
+# The doctor-shared transform is a byte-pinned copy of the training implementation.
+app/doctor/preprocessing.py -text
+ops/doctor_selector/*.sh text eol=lf
+model/artifacts/doctor_shared_grouped_701515/selection.json -text

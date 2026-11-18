@@ -1,5 +1,21 @@
 # FT-004 Chest X-ray Research App
 
+## Dataset selector update — 18 November 2026
+
+The Pulmo interface now supports Kaggle FT-004 (default) and a separate
+doctor-shared grouped 70/15/15 ensemble, using `model_source=kaggle|doctor`.
+Both return Normal/Viral/Bacterial scores; one ensemble is resident at a time.
+The doctor option is an exploratory public-source research comparison, not
+independent clinical validation. Possible Kaggle similarity, unresolved Normal
+source checksums and unverified pneumonia patient identity remain disclosed.
+Original training records, weights and nondeployment flags are unchanged.
+See [release methods, limitations and deployment checks](ops/doctor_selector/README.md).
+
+The doctor weight files are ignored in Git and must be transferred from the
+verified selected study artifacts, not downloaded from a guessed source.
+The bundled selection JSON and inference module pin all three SHA256 values.
+No source/patient images are required by or included in this deployment.
+
 Single-container FastAPI application that serves both:
 
 - the Vue/Vite frontend

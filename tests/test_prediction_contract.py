@@ -61,7 +61,7 @@ class PredictionContractTests(unittest.TestCase):
         class BrokenPredictor:
             def predict(self, image):
                 raise ValueError("inference failed")
-        with patch.object(inference, "_model", BrokenPredictor()), self.assertRaises(ValueError):
+        with patch.object(inference, "_model", BrokenPredictor()), patch.object(inference, "_verified_sources", {"kaggle"}), self.assertRaises(ValueError):
             inference.predict(Image.new("RGB", (64, 64)))
         self.assertTrue(inference._prediction_lock.acquire(blocking=False))
         inference._prediction_lock.release()

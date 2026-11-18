@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AppIcon from "./AppIcon.vue";
-import { CLASS_ORDER, PREDICTION_LABELS, type PredictionResult } from "../lib/prediction";
+import { CLASS_ORDER, MODEL_CATALOG, PREDICTION_LABELS, type PredictionResult } from "../lib/prediction";
 const props = defineProps<{
   open: boolean; result: PredictionResult; fileName: string; previewUrl: string;
   completedAt: string; imageSize: string; fileSize: string;
@@ -73,12 +73,14 @@ function downloadReport() {
     `Image: ${props.fileName}`,
     `Analyzed: ${new Date(props.completedAt).toLocaleString()}`,
     `Model: ${props.result.model} — ${props.result.member_count} × DenseNet201 ensemble`,
+    `Training dataset: ${MODEL_CATALOG[props.result.model_source].label}`,
     `Model version: ${props.result.model_version}`,
     `Prediction: ${predictionLabel.value} (${props.result.label})`,
     ...scores.value.map((item) => `${item.name} model score: ${item.score}%`),
     "Selection rule: highest equally averaged model score; exact ties follow Normal, Viral, Bacterial class order.",
     "Each score is the equal mean of the three models' scores for that class.", "",
     "Scores are model outputs, not calibrated clinical probabilities or measures of diagnostic certainty.",
+    ...(props.result.model_source === "doctor" ? ["Exploratory public-source doctor-shared collection; possible Kaggle similarity, unresolved Normal source checksums and unverified patient identities. Not independent clinical validation."] : []),
     "A normal prediction does not rule out pneumonia or another condition. Review with a qualified clinician.",
   ].join("\n");
   const url = URL.createObjectURL(new Blob([report], { type: "text/plain;charset=utf-8" }));
@@ -108,9 +110,11 @@ function downloadReport() {
             <p class="radiograph-note"><AppIcon name="clock" :size="12" />Analyzed {{ dateLabel }}</p>
           </figure>
           <section class="result-findings" aria-labelledby="prediction-title" :class="{ 'is-positive': positive }">
-            <div class="finding-label"><span class="finding-symbol"><AppIcon :name="positive ? 'scan' : 'check'" :size="16" /></span>MODEL PREDICTION<span class="model-type">FT-004</span></div>
+            <div class="finding-label"><span class="finding-symbol"><AppIcon :name="positive ? 'scan' : 'check'" :size="16" /></span>MODEL PREDICTION<span class="model-type">{{ result.model_source === 'doctor' ? 'Doctor-shared' : 'Kaggle FT-004' }}</span></div>
             <h3 id="prediction-title">{{ predictionLabel }} pattern</h3>
             <p class="finding-description">Three DenseNet201 models classified this image by averaging their scores equally.</p>
+            <p class="finding-description"><strong>Training dataset:</strong> {{ MODEL_CATALOG[result.model_source].label }}.</p>
+            <p v-if="result.model_source === 'doctor'" class="finding-description">Exploratory public-source collection with possible Kaggle similarity and unverified patient identities; not independent clinical validation.</p>
             <div class="primary-score"><div><span>{{ predictionLabel }} model score</span><strong>{{ winningScore }}<small>%</small></strong></div><span class="score-tag">{{ tied ? 'Tied highest scores' : 'Highest mean score' }}</span></div>
             <div class="result-score-breakdown" aria-label="Model score breakdown">
               <div class="breakdown-heading"><h4>Score breakdown</h4><span>0–100%</span></div>

@@ -1,0 +1,42 @@
+{
+  "selection_id": "DOCTOR-SHARED-GROUPED-701515-20261118-ENSEMBLE-S42",
+  "study": "doctor_shared_grouped_701515_20261118",
+  "status": "frozen_exploratory_research_model",
+  "research_use_only": true,
+  "clinical_use_permitted": false,
+  "protocol_hash": "4484aef80293d996944f20a04774ae2ec57a11ffd8272b8c942a72178291e5e2",
+  "split_manifest_sha256": "701b20b1cd34581b0cd5365217963b27ff9fe7c482c1f8b8b4c48855329dc820",
+  "class_order": ["Normal", "Viral", "Bacterial"],
+  "input_size": 224,
+  "ensemble_rule": "equal arithmetic mean",
+  "preprocessing_sha256": "b7a270ed0093426785c7bc8a6aba33ec6eaf796e6d399ddbc8a3ac68f8d84046",
+  "members": [
+    {
+      "order": 1,
+      "checkpoint": "member_1_selected_weights.pt",
+      "sha256": "c3277178176ece9de363ed80928a987c28e80bc0782fc39b4388e38b3daba365",
+      "epoch": 10,
+      "pipeline": "pseudo_color_then_histogram_equalization_then_clahe"
+    },
+    {
+      "order": 2,
+      "checkpoint": "member_2_selected_weights.pt",
+      "sha256": "3e9c64a39249e4cf6c24c14f5c38dce14f00cd72c08f7ee2239a5a6b509c09a8",
+      "epoch": 11,
+      "pipeline": "pseudo_color_then_histogram_equalization"
+    },
+    {
+      "order": 3,
+      "checkpoint": "member_3_selected_weights.pt",
+      "sha256": "9ec18784c14c5881f92bc4af8c4a8750b848c1d5f23c1a749e230437382bb4b2",
+      "epoch": 12,
+      "pipeline": "histogram_equalization"
+    }
+  ],
+  "limitations": [
+    "Doctor-shared public-source collection, not an independently collected clinical cohort",
+    "200 pneumonia images have possible similarity to original Kaggle images",
+    "Normal source checksums remain unresolved",
+    "Patient independence is not established; held-out results are internal only"
+  ]
+}
