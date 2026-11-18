@@ -6,6 +6,7 @@ import ResultCard from "./ResultCard.vue";
 import {
   CLASS_ORDER,
   MODEL_CATALOG,
+  nextModelSource,
   PREDICTION_LABELS,
   parsePrediction,
   validateImage,
@@ -123,6 +124,13 @@ function changeModel() {
   result.value = null;
   resultOpen.value = false;
   error.value = "";
+}
+function toggleModel() {
+  if (busy.value) return;
+  const next = nextModelSource(modelSource.value, doctorAvailable.value);
+  if (next === modelSource.value) return;
+  modelSource.value = next;
+  changeModel();
 }
 async function chooseFile(file?: File) {
   if (!file || loading.value) return;
@@ -263,11 +271,22 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div class="model-choice">
-        <label for="model-source">Choose training dataset</label>
-        <select id="model-source" v-model="modelSource" :disabled="busy" @change="changeModel">
-          <option value="kaggle">Kaggle dataset — original FT-004</option>
-          <option value="doctor" :disabled="!doctorAvailable">Doctor-shared dataset — 70/15/15{{ doctorAvailable ? '' : ' (unavailable)' }}</option>
-        </select>
+        <span id="model-source-label" class="model-choice-label">Choose training dataset</span>
+        <div class="model-switch-row" role="group" aria-labelledby="model-source-label">
+          <span :class="{ 'selected-source': modelSource === 'kaggle' }">Kaggle</span>
+          <button
+            id="model-source"
+            class="model-switch"
+            type="button"
+            role="switch"
+            aria-label="Use doctor-shared model"
+            :aria-checked="modelSource === 'doctor'"
+            :disabled="busy || (!doctorAvailable && modelSource === 'kaggle')"
+            @click="toggleModel"
+          ><span class="model-switch-thumb" aria-hidden="true"></span></button>
+          <span :class="{ 'selected-source': modelSource === 'doctor' }">Doctor-shared</span>
+        </div>
+        <small v-if="!doctorAvailable" role="status">Doctor-shared model is currently unavailable.</small>
         <p v-if="modelSource === 'doctor'" class="model-limitations">Exploratory research model: 300 doctor-shared public-source images. Possible Kaggle similarities and unverified patient identities mean this is not independent clinical validation.</p>
         <p v-else>Original Kaggle-trained research ensemble. Both options classify Normal, Viral and Bacterial patterns.</p>
         <small>One three-member ensemble is kept in memory. Switching datasets can take longer.</small>
@@ -490,8 +509,18 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .model-choice { margin: 20px 0 6px; padding: 14px 16px; border: 1px solid #dfe7d8; border-radius: 10px; background: #f7faf4; }
-.model-choice label { display: block; font-size: 12px; font-weight: 600; color: #3b624d; margin-bottom: 8px; }
-.model-choice select { display: block; width: 100%; max-width: 100%; border: 1px solid #cbd9c4; border-radius: 7px; padding: 10px 9px; background: #fff; color: #304b3c; font: inherit; font-size: 12px; }
+.model-choice-label { display: block; font-size: 12px; font-weight: 600; color: #3b624d; margin-bottom: 12px; }
+.model-switch-row { display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 40px; color: #63755d; font-size: 12px; }
+.model-switch-row > span { flex: 1; transition: color .18s; }
+.model-switch-row > span:first-child { text-align: right; }
+.model-switch-row .selected-source { color: #28563e; font-weight: 650; }
+.model-switch { flex: 0 0 60px; position: relative; width: 60px; height: 34px; padding: 0; border: 1px solid #63826c; border-radius: 999px; background: #d9e5d5; cursor: pointer; transition: background .18s; }
+.model-switch[aria-checked="true"] { background: #32694f; border-color: #32694f; }
+.model-switch-thumb { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px #1f3d2f30; transition: transform .18s ease; }
+.model-switch[aria-checked="true"] .model-switch-thumb { transform: translateX(26px); }
+.model-switch:focus-visible { outline: 3px solid #85ac8c; outline-offset: 4px; }
+.model-switch:disabled { cursor: not-allowed; opacity: .55; }
+@media (prefers-reduced-motion: reduce) { .model-switch,.model-switch-thumb,.model-switch-row > span { transition: none; } }
 .model-choice p,.model-choice small { display: block; font-size: 10px; line-height: 1.6; color: #62745c; margin: 8px 0 0; }
 .model-choice .model-limitations { color: #77602e; }
 .completed-analysis { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px 0 24px; text-align: center; }

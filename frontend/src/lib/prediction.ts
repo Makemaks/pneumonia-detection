@@ -1,6 +1,10 @@
 export const CLASS_ORDER = ["NORMAL", "VIRAL", "BACTERIAL"] as const;
 export type PredictionLabel = (typeof CLASS_ORDER)[number];
 export type ModelSource = "kaggle" | "doctor";
+export function nextModelSource(source: ModelSource, doctorAvailable: boolean): ModelSource {
+  if (source === "doctor") return "kaggle";
+  return doctorAvailable ? "doctor" : "kaggle";
+}
 export const MODEL_CATALOG = {
   kaggle: { model: "FT-004", version: "7a90abfa3695f61a17e4a2dd959c0da822080b21", label: "Kaggle dataset — original FT-004" },
   doctor: { model: "DOCTOR-SHARED-701515", version: "4484aef80293d996944f20a04774ae2ec57a11ffd8272b8c942a72178291e5e2", label: "Doctor-shared dataset — grouped 70/15/15" },

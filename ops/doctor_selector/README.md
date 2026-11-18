@@ -75,3 +75,19 @@ explicit rollback name, and creates the replacement with the same resource,
 security, loopback port and standalone network settings. It restores that
 original container automatically if checks fail. Do not use the older
 Compose cutover on this host without first reconciling its legacy backups.
+
+## Two-position switch UI
+
+The dataset dropdown is replaced with a labelled Kaggle / Doctor-shared
+switch. Its native button supports Enter/Space and exposes `role=switch` and
+`aria-checked`; the accessible name stays constant. It is disabled during
+analysis and cannot switch to an unavailable doctor package, while returning
+from doctor to Kaggle remains possible. Changing it clears stale results but
+retains the selected image. The original research warnings are unchanged.
+
+`Dockerfile.ui` overlays only the built static frontend on the verified
+two-model image. UI releases verify unchanged parent layers/configuration
+plus both candidate HTTP model routes; backend inheritance evidence is
+explicitly distinguished from fresh model-reference testing. The targeted
+deployment helper accepts a verified previous container ID and the applicable
+evidence filename, keeping per-revision rollback containers.

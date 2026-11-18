@@ -5,17 +5,20 @@ set -euo pipefail
 revision="${1:?Verified application revision required}"
 image="${2:?Verified release image required}"
 release="${3:?Absolute evidence directory required}"
+expected_old="${4:-ad96a823a97316b30da355e329b7167fa6bbd51ee91cb97fbc200b1cadba95d2}"
+model_evidence="${5:-candidate-model-verification.json}"
+case "$model_evidence" in candidate-model-verification.json|backend-inheritance-verification.json) ;; *) exit 2 ;; esac
 root=/var/www/pneumonia-detection
 case "$release" in "$root"/ops/releases/doctor-selector-*) ;; *) exit 2 ;; esac
-backup=pneumonia_app-rollback-20261118-59500de
-failed=pneumonia_app-failed-20261118-59500de
+backup="pneumonia_app-rollback-20261118-${revision:0:7}"
+failed="pneumonia_app-failed-20261118-${revision:0:7}"
 old=$(docker inspect pneumonia_app --format '{{.Id}}')
-test "$old" = ad96a823a97316b30da355e329b7167fa6bbd51ee91cb97fbc200b1cadba95d2
+test "$old" = "$expected_old"
 test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$revision"
 test "$(docker inspect pneumonia_doctor_candidate --format '{{.State.Running}} {{.State.OOMKilled}}')" = 'true false'
 if docker inspect "$backup" >/dev/null 2>&1 || docker inspect "$failed" >/dev/null 2>&1; then exit 2; fi
 python3 -c 'import json,sys; assert all(json.load(open(p))["verified"] for p in sys.argv[1:])' \
-  "$release/candidate-http-verification.json" "$release/candidate-model-verification.json"
+  "$release/candidate-http-verification.json" "$release/$model_evidence"
 git -C "$root" diff --quiet "$revision" -- app frontend model/artifacts
 docker ps --format '{{.ID}} {{.Names}}' | awk '$2 != "pneumonia_app" && $2 != "pneumonia_doctor_candidate"' | sort > "$release/targeted-other-containers.before"
 docker inspect pneumonia_app --format '{{json .State}}' > "$release/targeted-previous-state.json"

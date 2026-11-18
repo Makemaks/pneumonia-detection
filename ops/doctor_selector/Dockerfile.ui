@@ -1,0 +1,6 @@
+# Frontend-only release: inherit every verified backend/model layer unchanged.
+ARG BASE_IMAGE=pneumonia-dataset-selector:59500de-20261118
+FROM ${BASE_IMAGE}
+ARG APP_REVISION
+LABEL org.opencontainers.image.revision="${APP_REVISION}"
+COPY frontend/dist /app/app/static

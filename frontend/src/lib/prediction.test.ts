@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CLASS_ORDER, MODEL_CATALOG, parsePrediction, validateImage } from "./prediction.ts";
+import { CLASS_ORDER, MODEL_CATALOG, nextModelSource, parsePrediction, validateImage } from "./prediction.ts";
 
 const version = "7a90abfa3695f61a17e4a2dd959c0da822080b21";
 const validResponse = {
@@ -11,6 +11,13 @@ const validResponse = {
   class_order: [...CLASS_ORDER],
   member_count: 3,
 };
+
+test("two-model switch toggles available choices and always allows returning to Kaggle", () => {
+  assert.equal(nextModelSource("kaggle", true), "doctor");
+  assert.equal(nextModelSource("doctor", true), "kaggle");
+  assert.equal(nextModelSource("kaggle", false), "kaggle");
+  assert.equal(nextModelSource("doctor", false), "kaggle");
+});
 
 test("doctor source preserves its own model and rejects Kaggle substitution", () => {
   const doctor = { ...validResponse, model: MODEL_CATALOG.doctor.model,
