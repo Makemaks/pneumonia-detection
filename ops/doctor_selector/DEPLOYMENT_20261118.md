@@ -60,3 +60,28 @@ demonstration does not grant clinical permission.
 
 EC2 release records: `/var/www/pneumonia-detection/ops/releases/doctor-selector-20261118-59500de`.
 The separate first-candidate record is the sibling ending `c81c079`.
+
+## Follow-up: two-position dataset switch
+
+The dropdown was replaced, at the owner's request, with a Kaggle / Doctor-shared
+switch. UI application revision `5ab8879ec5bb2f13fa32061f8a22be5b80a64b10`
+is live as `pneumonia-dataset-switch:5ab8879-20261118`, image
+`sha256:caa3acc652a4234b5f48f7dc8ba4da2bb16b28a589e9e477e39744e2b003775f`.
+It adds one static frontend layer to the verified preceding image; all parent
+backend/model layers, runtime configuration, checkpoints and preprocessing
+remain unchanged. This was not another training or accuracy experiment.
+
+Eight frontend tests, 15 backend/verification tests, TypeScript/Vite build,
+candidate model-route checks and public HTTPS checks passed. Browser inspection
+confirmed click-to-Doctor, the limitation notice, and Space-key return to
+Kaggle. The switch is disabled during analysis and respects model availability.
+
+An initial cutover encountered a legitimate concurrent public analysis, and
+the probe's HTTP 503 caused a safe rollback. The probe now honors explicit
+`Retry-After` busy responses with bounded retries; it does not retry unavailable
+models without that header or hide other errors. The second cutover passed.
+The 1 GiB / 0.75 CPU limits and other services were unchanged; the prior
+two-model container is retained for rollback and the temporary candidate was
+removed. Source and deployment-probe changes were pushed to `master`.
+
+UI release evidence: `/var/www/pneumonia-detection/ops/releases/doctor-selector-ui-20261118-5ab8879`.
